@@ -142,6 +142,10 @@ class Term:
 
     @staticmethod
     def _parse_prefix(string: str) -> Tuple[Term, str]:
+        """Parses a prefix of the given string into a term."""
+        if string[0] == '_':
+            return Term('_'), string[1:]
+
         if is_constant(string[0]) or is_variable(string[0]):
             i = 1
             while i < len(string) and string[i].isalnum():
@@ -164,12 +168,12 @@ class Term:
                 arg, rest = Term._parse_prefix(rest[1:])
                 arguments.append(arg)
 
-            rest = rest[1:]
-            return Term(root, arguments), rest
+            return Term(root, arguments), rest[1:]
         # Task 7.3a
 
     @staticmethod
     def parse(string: str) -> Term:
+        """Parses the given valid string representation into a term."""
         term, rest = Term._parse_prefix(string)
         assert rest == ''
         return term
@@ -442,6 +446,7 @@ class Formula:
 
     @staticmethod
     def _parse_prefix(string: str) -> Tuple[Formula, str]:
+        """Parses a prefix of the given string into a formula."""
         if is_unary(string[0]):
             subformula, rest = Formula._parse_prefix(string[1:])
             return Formula(string[0], subformula), rest
@@ -472,8 +477,14 @@ class Formula:
             while i < len(string) and string[i].isalnum():
                 i += 1
             root = string[:i]
-            rest = string[i + 1:]
+            rest = string[i:]
+
+            rest = rest[1:]
             arguments = []
+
+
+            if rest[0] == ')':
+                return Formula(root, arguments), rest[1:]
 
             arg, rest = Term._parse_prefix(rest)
             arguments.append(arg)
@@ -490,10 +501,11 @@ class Formula:
         # Task 7.4a
 
     @staticmethod
-    def parse(string: str) -> Term:
-        term, rest = Term._parse_prefix(string)
+    def parse(string: str) -> Formula:
+        """Parses the given valid string representation into a formula."""
+        formula, rest = Formula._parse_prefix(string)
         assert rest == ''
-        return term
+        return formula
         # Task 7.4b
 
     def constants(self) -> Set[str]:
