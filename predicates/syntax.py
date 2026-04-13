@@ -451,8 +451,8 @@ class Formula:
             while i < len(string) and string[i].isalnum():
                 i += 1
             variable = string[1:i]
-            statement, rest = Formula._parse_prefix(string[i + 1:])  # пропускаем '['
-            return Formula(string[0], variable, statement), rest[1:]  # пропускаем ']'
+            statement, rest = Formula._parse_prefix(string[i + 1:])
+            return Formula(string[0], variable, statement), rest[1:]
 
         if string[0] == '(':
             first, rest = Formula._parse_prefix(string[1:])
@@ -465,14 +465,14 @@ class Formula:
                 rest = rest[1:]
 
             second, rest = Formula._parse_prefix(rest)
-            return Formula(root, first, second), rest[1:]  # пропускаем ')'
+            return Formula(root, first, second), rest[1:]
 
         if is_relation(string[0]):
             i = 1
             while i < len(string) and string[i].isalnum():
                 i += 1
             root = string[:i]
-            rest = string[i + 1:]  # пропускаем '('
+            rest = string[i + 1:]
             arguments = []
 
             arg, rest = Term._parse_prefix(rest)
@@ -482,18 +482,18 @@ class Formula:
                 arg, rest = Term._parse_prefix(rest[1:])
                 arguments.append(arg)
 
-            return Formula(root, arguments), rest[1:]  # пропускаем ')'
+            return Formula(root, arguments), rest[1:]
 
         first, rest = Term._parse_prefix(string)
-        second, rest = Term._parse_prefix(rest[1:])  # пропускаем '='
+        second, rest = Term._parse_prefix(rest[1:])
         return Formula('=', [first, second]), rest
         # Task 7.4a
 
     @staticmethod
-    def parse(string: str) -> Formula:
-        formula, rest = Formula._parse_prefix(string)
+    def parse(string: str) -> Term:
+        term, rest = Term._parse_prefix(string)
         assert rest == ''
-        return formula
+        return term
         # Task 7.4b
 
     def constants(self) -> Set[str]:
