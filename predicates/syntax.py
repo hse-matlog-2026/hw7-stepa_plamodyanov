@@ -108,12 +108,7 @@ class Term:
 
     @memoized_parameterless_method
     def __repr__(self) -> str:
-        """Computes the string representation of the current term.
-
-        Returns:
-            The standard string representation of the current term.
-        """
-        if self.arguments is None:
+        if is_constant(self.root) or is_variable(self.root):
             return self.root
         return f'{self.root}({",".join(map(repr, self.arguments))})'
         # Task 7.1
@@ -147,18 +142,6 @@ class Term:
 
     @staticmethod
     def _parse_prefix(string: str) -> Tuple[Term, str]:
-        """Parses a prefix of the given string into a term.
-
-        Parameters:
-            string: string to parse, which has a prefix that is a valid
-                representation of a term.
-
-        Returns:
-            A pair of the parsed term and the unparsed suffix of the string. If
-            the given string has as a prefix a constant name (e.g., ``'c12'``)
-            or a variable name (e.g., ``'x12'``), then the parsed prefix will be
-            that entire name (and not just a part of it, such as ``'x1'``).
-        """
         if is_constant(string[0]) or is_variable(string[0]):
             i = 1
             while i < len(string) and string[i].isalnum():
@@ -170,31 +153,25 @@ class Term:
             while i < len(string) and string[i].isalnum():
                 i += 1
             root = string[:i]
-            remainder = string[i:]
+            rest = string[i:]
             arguments = []
 
-            remainder = remainder[1:]
-            argument, remainder = Term._parse_prefix(remainder)
-            arguments.append(argument)
+            rest = rest[1:]
+            arg, rest = Term._parse_prefix(rest)
+            arguments.append(arg)
 
-            while remainder[0] == ',':
-                argument, remainder = Term._parse_prefix(remainder[1:])
-                arguments.append(argument)
+            while rest[0] == ',':
+                arg, rest = Term._parse_prefix(rest[1:])
+                arguments.append(arg)
 
-            return Term(root, arguments), remainder[1:]
+            rest = rest[1:]
+            return Term(root, arguments), rest
         # Task 7.3a
 
     @staticmethod
     def parse(string: str) -> Term:
-        """Parses the given valid string representation into a term.
-
-        Parameters:
-            string: string to parse.
-
-        Returns:
-            A term whose standard string representation is the given string.
-        """
-        term, remainder = Term._parse_prefix(string)
+        term, rest = Term._parse_prefix(string)
+        assert rest == ''
         return term
         # Task 7.3b
 
@@ -425,20 +402,15 @@ class Formula:
 
     @memoized_parameterless_method
     def __repr__(self) -> str:
-        """Computes the string representation of the current formula.
-
-        Returns:
-            The standard string representation of the current formula.
-        """
-        if is_relation(self.root) or is_equality(self.root):
-            return f'{self.root}({",".join(map(repr, self.arguments))})' if is_relation(
-                self.root) else f'{repr(self.arguments[0])}={repr(self.arguments[1])}'
+        if is_equality(self.root):
+            return f'{repr(self.arguments[0])}={repr(self.arguments[1])}'
+        if is_relation(self.root):
+            return f'{self.root}({",".join(map(repr, self.arguments))})'
         if is_unary(self.root):
             return f'{self.root}{repr(self.first)}'
         if is_binary(self.root):
             return f'({repr(self.first)}{self.root}{repr(self.second)})'
-        if is_quantifier(self.root):
-            return f'{self.root}{self.variable}[{repr(self.statement)}]'
+        return f'{self.root}{self.variable}[{repr(self.statement)}]'
         # Task 7.2
 
     def __eq__(self, other: object) -> bool:
@@ -470,27 +442,22 @@ class Formula:
 
     @staticmethod
     def _parse_prefix(string: str) -> Tuple[Formula, str]:
-        """Parses a prefix of the given string into a formula.
-
-        Parameters:
-            string: string to parse, which has a prefix that is a valid
-                representation of a formula.
-
-        Returns:
-            A pair of the parsed formula and the unparsed suffix of the string.
-            If the given string has as a prefix a term followed by an equality
-            followed by a constant name (e.g., ``'f(y)=c12'``) or by a variable
-            name (e.g., ``'f(y)=x12'``), then the parsed prefix will include
-            that entire name (and not just a part of it, such as ``'f(y)=x1'``).
-        """
         if is_unary(string[0]):
-            formula, rest = Formula._parse_prefix(string[1:])
-            return Formula(string[0], formula), rest
+            subformula, rest = Formula._parse_prefix(string[1:])
+            return Formula(string[0], subformula), rest
+
+        if is_quantifier(string[0]):
+            i = 1
+            while i < len(string) and string[i].isalnum():
+                i += 1
+            variable = string[1:i]
+            statement, rest = Formula._parse_prefix(string[i + 1:])  # пропускаем '['
+            return Formula(string[0], variable, statement), rest[1:]  # пропускаем ']'
 
         if string[0] == '(':
             first, rest = Formula._parse_prefix(string[1:])
 
-            if rest.startswith('->'):
+            if rest[:2] == '->':
                 root = '->'
                 rest = rest[2:]
             else:
@@ -498,46 +465,34 @@ class Formula:
                 rest = rest[1:]
 
             second, rest = Formula._parse_prefix(rest)
-            return Formula(root, first, second), rest[1:]
-
-        if is_quantifier(string[0]):
-            variable, rest = Term._parse_prefix(string[1:])
-            statement, rest = Formula._parse_prefix(rest[1:])
-            return Formula(string[0], variable.root, statement), rest[1:]
+            return Formula(root, first, second), rest[1:]  # пропускаем ')'
 
         if is_relation(string[0]):
             i = 1
             while i < len(string) and string[i].isalnum():
                 i += 1
             root = string[:i]
-            rest = string[i + 1:]
-
+            rest = string[i + 1:]  # пропускаем '('
             arguments = []
-            term, rest = Term._parse_prefix(rest)
-            arguments.append(term)
+
+            arg, rest = Term._parse_prefix(rest)
+            arguments.append(arg)
 
             while rest[0] == ',':
-                term, rest = Term._parse_prefix(rest[1:])
-                arguments.append(term)
+                arg, rest = Term._parse_prefix(rest[1:])
+                arguments.append(arg)
 
-            return Formula(root, arguments), rest[1:]
+            return Formula(root, arguments), rest[1:]  # пропускаем ')'
 
-        first_term, rest = Term._parse_prefix(string)
-        second_term, rest = Term._parse_prefix(rest[1:])
-        return Formula('=', [first_term, second_term]), rest
+        first, rest = Term._parse_prefix(string)
+        second, rest = Term._parse_prefix(rest[1:])  # пропускаем '='
+        return Formula('=', [first, second]), rest
         # Task 7.4a
 
     @staticmethod
     def parse(string: str) -> Formula:
-        """Parses the given valid string representation into a formula.
-
-        Parameters:
-            string: string to parse.
-
-        Returns:
-            A formula whose standard string representation is the given string.
-        """
         formula, rest = Formula._parse_prefix(string)
+        assert rest == ''
         return formula
         # Task 7.4b
 
